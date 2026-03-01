@@ -4,11 +4,10 @@ export async function GET() {
   const apiKey = process.env.YOUTUBE_API_KEY || process.env.NEXT_PUBLIC_YOUTUBE_API_KEY;
   const channelId = process.env.YOUTUBE_CHANNEL_ID || process.env.NEXT_PUBLIC_YOUTUBE_CHANNEL_ID;
 
+  // Graceful fallback: return empty items if API keys are not configured
   if (!apiKey || !channelId) {
-    return NextResponse.json(
-      { error: "Missing YOUTUBE_API_KEY or YOUTUBE_CHANNEL_ID" },
-      { status: 500 }
-    );
+    console.warn("[YouTube API] Missing YOUTUBE_API_KEY or YOUTUBE_CHANNEL_ID - returning empty items");
+    return NextResponse.json({ items: [] });
   }
 
   const url = new URL("https://www.googleapis.com/youtube/v3/search");
