@@ -7,13 +7,16 @@ import HeroSection from "@/components/HeroSection";
 import BlogSection from "@/components/BlogSection";
 import VideosSection from "@/components/VideosSection";
 import SectionDivider from "@/components/SectionDivider";
-import { getBlogs, BlogPost } from "@/lib/data";
+import type { BlogPost } from "@/lib/data";
 
 export default function Home() {
   const [posts, setPosts] = useState<BlogPost[]>([]);
 
   useEffect(() => {
-    setPosts(getBlogs());
+    fetch("/api/posts?limit=12")
+      .then((r) => r.json())
+      .then((data) => setPosts(data.items || []))
+      .catch(() => setPosts([]));
   }, []);
 
   return (

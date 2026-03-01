@@ -1,10 +1,68 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-import { getBlogById, BlogPost } from "@/lib/data";
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+import { supabaseService } from "@/lib/supabaseServer";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+
+const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://retiretownwise.com';
+
+interface BlogPost {
+  id: string;
+  title: string;
+  summary: string;
+  content: string;
+  coverImage: string;
+  videoUrl: string;
+  publishedAt: string;
+}
+
+function mapRow(row: any): BlogPost {
+  return {
+    id: row.id,
+    title: row.title ?? '',
+    summary: row.summary ?? '',
+    content: row.content_html ?? '',
+    coverImage: row.cover_image_url ?? '',
+    videoUrl: row.youtube_url ?? '',
+    publishedAt: row.published_at ?? row.created_at ?? new Date().toISOString(),
+  };
+}
+
+async function getPost(id: string): Promise<BlogPost | null> {
+  const { data, error } = await supabaseService
+    .from('posts')
+    .select('*')
+    .eq('id', id)
+    .single();
+  if (error || !data) return null;
+  return mapRow(data);
+}
+
+export async function generateMetadata({ params }: { params: Promise<{ blogId: string }> }): Promise<Metadata> {
+  const { blogId } = await params;
+  const post = await getPost(blogId);
+  if (!post) {
+    return { title: 'Article Not Found | Retire Townwise' };
+  }
+  return {
+    title: `${post.title} | Retire Townwise`,
+    description: post.summary || post.title,
+    openGraph: {
+      title: post.title,
+      description: post.summary || post.title,
+      url: `${BASE_URL}/${post.id}`,
+      type: 'article',
+      images: post.coverImage ? [{ url: post.coverImage, width: 1200, height: 630 }] : [],
+      publishedTime: post.publishedAt,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: post.title,
+      description: post.summary || post.title,
+      images: post.coverImage ? [post.coverImage] : [],
+    },
+  };
+}
 
 function VideoEmbed({ url }: { url: string }) {
   if (!url) return null;
@@ -61,43 +119,14 @@ function VideoEmbed({ url }: { url: string }) {
   );
 }
 
-export default function BlogDetailPage() {
-  const { blogId } = useParams<{ blogId: string }>();
-  const [post, setPost] = useState<BlogPost | null>(null);
-  const [loading, setLoading] = useState(true);
+export const revalidate = 300; // Revalidate every 5 minutes
 
-  useEffect(() => {
-    if (blogId) {
-      const found = getBlogById(blogId);
-      setPost(found);
-      setLoading(false);
-    }
-  }, [blogId]);
-
-  if (loading) {
-    return (
-      <main className="min-h-screen">
-        <Header />
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="w-8 h-8 border-2 border-[#F4C97A]/30 border-t-[#F4C97A] rounded-full animate-spin" />
-        </div>
-      </main>
-    );
-  }
+export default async function BlogDetailPage({ params }: { params: Promise<{ blogId: string }> }) {
+  const { blogId } = await params;
+  const post = await getPost(blogId);
 
   if (!post) {
-    return (
-      <main className="min-h-screen">
-        <Header />
-        <div className="flex flex-col items-center justify-center min-h-screen gap-4 px-6">
-          <h1 className="text-3xl font-bold text-[#3A2E22]">Article Not Found</h1>
-          <p className="text-[#6B5C4A]/80">This article may have been removed or the link is incorrect.</p>
-          <a href="/" className="mt-4 px-6 py-2.5 bg-[#EFCB88] text-[#3A2E22] font-bold rounded-full text-sm hover:bg-[#EFCB88]/90 transition-colors">
-            Back to Home
-          </a>
-        </div>
-      </main>
-    );
+    notFound();
   }
 
   return (

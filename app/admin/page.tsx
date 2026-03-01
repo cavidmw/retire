@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import dynamic from "next/dynamic";
-import { getBlogs, saveBlog, deleteBlog, generateId, BlogPost } from "@/lib/data";
+import type { BlogPost } from "@/lib/data";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -12,7 +12,7 @@ import DOMPurify from "dompurify";
 // Render editor strictly on client to avoid SSR hydration mismatches
 const ClientEditor = dynamic(() => Promise.resolve(Editor), { ssr: false });
 
-const ADMIN_PASSWORD = "townwise2025";
+// Password is now server-side only (process.env.ADMIN_PASSWORD)
 
 const emptyForm = (): Omit<BlogPost, "id" | "slug"> => ({
   title: "",
@@ -34,27 +34,82 @@ export default function AdminPage() {
   const [saved, setSaved] = useState(false);
   const [activeTab, setActiveTab] = useState<"list" | "editor">("list");
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [coverError, setCoverError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [loggingIn, setLoggingIn] = useState(false);
 
   useEffect(() => {
-    if (authed) setBlogs(getBlogs());
+    if (!authed) return;
+    fetch("/api/posts?limit=1000")
+      .then((r) => r.json())
+      .then((d) => setBlogs(d.items || []))
+      .catch(() => setBlogs([]));
   }, [authed]);
 
-  const handleLogin = () => {
-    if (pw === ADMIN_PASSWORD) {
-      setAuthed(true);
-      setPwError(false);
-    } else {
+  const handleLogin = async () => {
+    if (!pw.trim()) return;
+    setLoggingIn(true);
+    setPwError(false);
+    try {
+      const res = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: pw }),
+      });
+      if (res.ok) {
+        setAuthed(true);
+        setPw("");
+      } else {
+        setPwError(true);
+      }
+    } catch {
       setPwError(true);
+    } finally {
+      setLoggingIn(false);
     }
   };
 
-  const handleSave = () => {
+  const handleLogout = async () => {
+    await fetch("/api/admin/login", { method: "DELETE" });
+    setAuthed(false);
+    setPw("");
+  };
+
+  const handleSave = async () => {
     if (!form.title.trim() || !form.content.trim()) return;
+    if (typeof form.coverImage === "string" && form.coverImage.startsWith("data:")) {
+      setCoverError("Base64 görsel desteklenmiyor. Lütfen dosya yükleyin veya bir URL girin.");
+      return;
+    }
+    setCoverError(null);
+    setSaveError(null);
     setSaving(true);
-    const id = editingId || generateId();
-    const post: BlogPost = { ...form, id, slug: id };
-    saveBlog(post);
-    setBlogs(getBlogs());
+    const payload = {
+      title: form.title,
+      summary: form.summary,
+      content: form.content,
+      coverImage: form.coverImage,
+      videoUrl: form.videoUrl,
+      publishedAt: form.publishedAt,
+      id: editingId || undefined,
+    };
+    const method = editingId ? "PUT" : "POST";
+    const res = await fetch("/api/admin/posts", {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || json?.ok === false) {
+      setSaving(false);
+      setSaveError(json?.error || json?.details || "Kaydetme başarısız oldu");
+      return;
+    }
+    await fetch("/api/posts?limit=1000")
+      .then((r) => r.json())
+      .then((d) => setBlogs(d.items || []))
+      .catch(() => setBlogs([]));
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -76,9 +131,16 @@ export default function AdminPage() {
     setActiveTab("editor");
   };
 
-  const handleDelete = (id: string) => {
-    deleteBlog(id);
-    setBlogs(getBlogs());
+  const handleDelete = async (id: string) => {
+    await fetch("/api/admin/posts", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    await fetch("/api/posts?limit=1000")
+      .then((r) => r.json())
+      .then((d) => setBlogs(d.items || []))
+      .catch(() => setBlogs([]));
     setDeleteConfirm(null);
     if (editingId === id) {
       setEditingId(null);
@@ -129,9 +191,10 @@ export default function AdminPage() {
           )}
           <button
             onClick={handleLogin}
-            className="w-full mt-4 bg-[#EFCB88] hover:bg-[#EFCB88]/90 text-[#3A2E22] font-bold py-3 rounded-xl text-sm transition-colors duration-200"
+            disabled={loggingIn || !pw.trim()}
+            className="w-full mt-4 bg-[#EFCB88] hover:bg-[#EFCB88]/90 text-[#3A2E22] font-bold py-3 rounded-xl text-sm transition-colors duration-200 disabled:opacity-50"
           >
-            Sign In
+            {loggingIn ? "Signing in..." : "Sign In"}
           </button>
         </div>
       </div>
@@ -165,7 +228,7 @@ export default function AdminPage() {
             View Site
           </a>
           <button
-            onClick={() => setAuthed(false)}
+            onClick={handleLogout}
             className="text-[#6B5C4A]/70 hover:text-red-500 text-xs transition-colors"
           >
             Sign Out
@@ -318,18 +381,45 @@ export default function AdminPage() {
                   <input
                     type="file"
                     accept="image/*"
-                    onChange={(e) => {
+                    disabled={uploading}
+                    onChange={async (e) => {
                       const f = e.target.files?.[0];
                       if (!f) return;
-                      const reader = new FileReader();
-                      reader.onload = () => {
-                        setForm({ ...form, coverImage: String(reader.result || "") });
-                      };
-                      reader.readAsDataURL(f);
+                      setCoverError(null);
+                      if (f.size > 10 * 1024 * 1024) {
+                        setCoverError("Dosya çok büyük (max 10MB).");
+                        return;
+                      }
+                      try {
+                        setUploading(true);
+                        const fd = new FormData();
+                        fd.append("file", f);
+                        const resp = await fetch("/api/admin/upload", { method: "POST", body: fd });
+                        const data = await resp.json();
+                        if (!resp.ok || data?.ok === false) {
+                          setCoverError(data?.error || data?.details || "Yükleme başarısız oldu");
+                          return;
+                        }
+                        setForm({ ...form, coverImage: data.url });
+                      } catch (err) {
+                        const msg = (err as any)?.message || "Yükleme sırasında hata oluştu";
+                        setCoverError(msg);
+                      } finally {
+                        setUploading(false);
+                      }
                     }}
                     className="block w-full text-sm text-[#3A2E22] file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-[#EFCB88] file:text-[#3A2E22] hover:file:bg-[#EFCB88]/90"
                   />
                 </div>
+                {coverError && (
+                  <p className="text-red-500 text-xs mt-2">{coverError}</p>
+                )}
+                {uploading && (
+                  <p className="text-[#6B5C4A]/70 text-xs mt-2">Uploading...</p>
+                )}
+                {typeof form.coverImage === "string" && form.coverImage.startsWith("data:") && (
+                  <p className="text-red-500 text-xs mt-2">Eski kayıt base64; lütfen yeniden dosya yükle</p>
+                )}
                 {form.coverImage && (
                   <img
                     src={form.coverImage}
@@ -364,9 +454,12 @@ export default function AdminPage() {
                 />
               </div>
 
+              {saveError && (
+                <p className="text-red-500 text-xs mb-3">{saveError}</p>
+              )}
               <button
                 onClick={handleSave}
-                disabled={!form.title.trim() || !form.content.trim() || saving}
+                disabled={!form.title.trim() || !form.content.trim() || saving || uploading || (typeof form.coverImage === "string" && form.coverImage.startsWith("data:"))}
                 className={`w-full py-3 rounded-xl font-bold text-sm transition-all duration-200 ${
                   saved
                     ? "bg-[#4F8F4E] text-white"
@@ -424,7 +517,7 @@ function Editor({ value, onChange }: { value: string; onChange: (html: string) =
     const current = editor.getHTML();
     const incoming = value || "";
     if (incoming !== current) {
-      editor.commands.setContent(incoming, false);  
+      editor.commands.setContent(incoming, { emitUpdate: false });  
     }
   }, [value, editor]);
 
