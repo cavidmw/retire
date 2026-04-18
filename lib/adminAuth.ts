@@ -37,21 +37,29 @@ export function checkRateLimit(ip: string): { allowed: boolean; retryAfter?: num
   return { allowed: true };
 }
 
-// Generate a simple session token (in production, use a proper JWT or signed token)
+import crypto from 'crypto';
+
+// Generate a signed session token
 export function generateSessionToken(): string {
   const payload = {
     role: 'admin',
     exp: Date.now() + 24 * 60 * 60 * 1000, // 24 hours
     rand: Math.random().toString(36).slice(2),
   };
-  // Simple encoding (not cryptographically secure, but sufficient for basic use)
-  const encoded = Buffer.from(JSON.stringify(payload)).toString('base64');
-  return encoded;
+  const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const signature = crypto.createHmac('sha256', SESSION_SECRET).update(encodedPayload).digest('base64url');
+  return `${encodedPayload}.${signature}`;
 }
 
 export function verifySessionToken(token: string): boolean {
   try {
-    const decoded = JSON.parse(Buffer.from(token, 'base64').toString('utf-8'));
+    const parts = token.split('.');
+    if (parts.length !== 2) return false;
+    const [encodedPayload, signature] = parts;
+    const expectedSignature = crypto.createHmac('sha256', SESSION_SECRET).update(encodedPayload).digest('base64url');
+    if (signature !== expectedSignature) return false;
+
+    const decoded = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf-8'));
     if (decoded.role !== 'admin') return false;
     if (typeof decoded.exp !== 'number' || Date.now() > decoded.exp) return false;
     return true;

@@ -22,10 +22,56 @@ function useScrollReveal(ref: React.RefObject<HTMLElement | null>) {
   }, [ref]);
 }
 
+// ─── Tip tanımları ────────────────────────────────────────────────────────────
+interface FormState {
+  name: string;
+  email: string;
+  subject: string;
+  message: string;
+}
+
+interface FieldErrors {
+  name?: string;
+  email?: string;
+  subject?: string;
+  message?: string;
+}
+
+// ─── Yardımcı: e-posta doğrulama ─────────────────────────────────────────────
+function isValidEmail(email: string): boolean {
+  return /^[^\s@"'<>]{1,64}@[^\s@"'<>]{1,255}\.[a-zA-Z]{2,}$/.test(email);
+}
+
+// ─── Frontend doğrulama ───────────────────────────────────────────────────────
+function validate(form: FormState): FieldErrors {
+  const errors: FieldErrors = {};
+  if (!form.name.trim()) errors.name = "Name is required.";
+  else if (form.name.trim().length > 100) errors.name = "Name cannot exceed 100 characters.";
+
+  if (!form.email.trim()) errors.email = "Email is required.";
+  else if (!isValidEmail(form.email.trim())) errors.email = "Enter a valid email address.";
+  else if (form.email.trim().length > 254) errors.email = "Email is too long.";
+
+  if (!form.subject.trim()) errors.subject = "Subject is required.";
+  else if (form.subject.trim().length > 200) errors.subject = "Subject cannot exceed 200 characters.";
+
+  if (!form.message.trim()) errors.message = "Message is required.";
+  else if (form.message.trim().length > 5000)
+    errors.message = `Message is too long (${form.message.trim().length}/5000).`;
+
+  return errors;
+}
+
 export default function ContactPage() {
-  const [form, setForm] = useState({ name: "", email: "", subject: "", message: "" });
+  const emptyForm = (): FormState => ({ name: "", email: "", subject: "", message: "" });
+
+  const [form, setForm] = useState<FormState>(emptyForm());
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [submitted, setSubmitted] = useState(false);
   const [sending, setSending] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
+  // Zaman kontrolü için form yüklenme zamanı
+  const [loadedAt] = useState(() => Date.now());
 
   const heroRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLDivElement>(null);
@@ -35,13 +81,62 @@ export default function ContactPage() {
   useScrollReveal(formRef);
   useScrollReveal(infoRef);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Anlık doğrulama — kullanıcı yazdıkça sadece dokunduğu alanı göster
+  const handleChange = (field: keyof FormState, value: string) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+    // O alanın hatasını temizle
+    if (fieldErrors[field]) {
+      setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
+    }
+    setApiError(null);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Çoklu tıklama koruması
+    if (sending) return;
+
+    // Frontend doğrulama
+    const errors = validate(form);
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      return;
+    }
+
     setSending(true);
-    setTimeout(() => {
-      setSending(false);
+    setApiError(null);
+
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name.trim(),
+          email: form.email.trim(),
+          subject: form.subject.trim(),
+          message: form.message.trim(),
+          // Güvenlik sinyalleri
+          _loadedAt: loadedAt,
+          // Honeypot alanları (bot doldurursa yakalanır)
+          website: "",
+          phone_number: "",
+        }),
+      });
+
+      const data = await res.json().catch(() => ({ ok: false, error: "An unexpected error occurred." }));
+
+      if (!res.ok || data?.ok === false) {
+        setApiError(data?.error || "Message could not be sent. Please try again.");
+        return;
+      }
+
       setSubmitted(true);
-    }, 1200);
+    } catch {
+      setApiError("Connection error. Please check your internet connection and try again.");
+    } finally {
+      setSending(false);
+    }
   };
 
   const contacts = [
@@ -120,69 +215,147 @@ export default function ContactPage() {
                     Thanks for reaching out. We'll get back to you as soon as possible.
                   </p>
                   <button
-                    onClick={() => { setSubmitted(false); setForm({ name: "", email: "", subject: "", message: "" }); }}
+                    onClick={() => {
+                      setSubmitted(false);
+                      setForm(emptyForm());
+                      setFieldErrors({});
+                    }}
                     className="mt-2 text-[#A56A00] text-sm hover:underline"
                   >
                     Send another message
                   </button>
                 </div>
               ) : (
-                <form onSubmit={handleSubmit} className="space-y-5">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    <div>
-                      <label className="block text-[#6B5C4A]/80 text-xs font-semibold uppercase tracking-widest mb-2">
-                        Name
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={form.name}
-                        onChange={(e) => setForm({ ...form, name: e.target.value })}
-                        placeholder="Your name"
-                        className="w-full bg-[#FFFDF5] border border-[#E8DAC0] focus:border-[#EFCB88] rounded-xl px-4 py-3 text-[#3A2E22] text-sm placeholder-black/40 outline-none transition-colors"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[#6B5C4A]/80 text-xs font-semibold uppercase tracking-widest mb-2">
-                        Email
-                      </label>
-                      <input
-                        type="email"
-                        required
-                        value={form.email}
-                        onChange={(e) => setForm({ ...form, email: e.target.value })}
-                        placeholder="your@email.com"
-                        className="w-full bg-[#FFFDF5] border border-[#E8DAC0] focus:border-[#EFCB88] rounded-xl px-4 py-3 text-[#3A2E22] text-sm placeholder-black/40 outline-none transition-colors"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-[#6B5C4A]/80 text-xs font-semibold uppercase tracking-widest mb-2">
-                      Subject
-                    </label>
+                <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+                  {/* Honeypot — görünmez, botların doldurduğu alan */}
+                  <div aria-hidden="true" style={{ position: "absolute", left: "-9999px", top: "-9999px" }}>
                     <input
                       type="text"
-                      value={form.subject}
-                      onChange={(e) => setForm({ ...form, subject: e.target.value })}
-                      placeholder="What's this about?"
-                      className="w-full bg-[#FFFDF5] border border-[#E8DAC0] focus:border-[#EFCB88] rounded-xl px-4 py-3 text-[#3A2E22] text-sm placeholder-black/40 outline-none transition-colors"
+                      name="website"
+                      value=""
+                      tabIndex={-1}
+                      autoComplete="off"
+                      onChange={() => {}}
+                    />
+                    <input
+                      type="text"
+                      name="phone_number"
+                      value=""
+                      tabIndex={-1}
+                      autoComplete="off"
+                      onChange={() => {}}
                     />
                   </div>
 
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    {/* Name */}
+                    <div>
+                      <label className="block text-[#6B5C4A]/80 text-xs font-semibold uppercase tracking-widest mb-2">
+                        Name <span className="text-red-400">*</span>
+                      </label>
+                      <input
+                        id="contact-name"
+                        type="text"
+                        required
+                        maxLength={100}
+                        value={form.name}
+                        onChange={(e) => handleChange("name", e.target.value)}
+                        placeholder="Your name"
+                        autoComplete="name"
+                        className={`w-full bg-[#FFFDF5] border rounded-xl px-4 py-3 text-[#3A2E22] text-sm placeholder-black/40 outline-none transition-colors ${
+                          fieldErrors.name ? "border-red-400 focus:border-red-400" : "border-[#E8DAC0] focus:border-[#EFCB88]"
+                        }`}
+                      />
+                      {fieldErrors.name && (
+                        <p className="text-red-400 text-xs mt-1.5">{fieldErrors.name}</p>
+                      )}
+                    </div>
+
+                    {/* Email */}
+                    <div>
+                      <label className="block text-[#6B5C4A]/80 text-xs font-semibold uppercase tracking-widest mb-2">
+                        Email <span className="text-red-400">*</span>
+                      </label>
+                      <input
+                        id="contact-email"
+                        type="email"
+                        required
+                        maxLength={254}
+                        value={form.email}
+                        onChange={(e) => handleChange("email", e.target.value)}
+                        placeholder="your@email.com"
+                        autoComplete="email"
+                        className={`w-full bg-[#FFFDF5] border rounded-xl px-4 py-3 text-[#3A2E22] text-sm placeholder-black/40 outline-none transition-colors ${
+                          fieldErrors.email ? "border-red-400 focus:border-red-400" : "border-[#E8DAC0] focus:border-[#EFCB88]"
+                        }`}
+                      />
+                      {fieldErrors.email && (
+                        <p className="text-red-400 text-xs mt-1.5">{fieldErrors.email}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Subject */}
                   <div>
                     <label className="block text-[#6B5C4A]/80 text-xs font-semibold uppercase tracking-widest mb-2">
-                      Message
+                      Subject <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      id="contact-subject"
+                      type="text"
+                      required
+                      maxLength={200}
+                      value={form.subject}
+                      onChange={(e) => handleChange("subject", e.target.value)}
+                      placeholder="What's this about?"
+                      className={`w-full bg-[#FFFDF5] border rounded-xl px-4 py-3 text-[#3A2E22] text-sm placeholder-black/40 outline-none transition-colors ${
+                        fieldErrors.subject ? "border-red-400 focus:border-red-400" : "border-[#E8DAC0] focus:border-[#EFCB88]"
+                      }`}
+                    />
+                    {fieldErrors.subject && (
+                      <p className="text-red-400 text-xs mt-1.5">{fieldErrors.subject}</p>
+                    )}
+                  </div>
+
+                  {/* Message */}
+                  <div>
+                    <label className="block text-[#6B5C4A]/80 text-xs font-semibold uppercase tracking-widest mb-2">
+                      Message <span className="text-red-400">*</span>
                     </label>
                     <textarea
+                      id="contact-message"
                       required
                       rows={6}
+                      maxLength={5000}
                       value={form.message}
-                      onChange={(e) => setForm({ ...form, message: e.target.value })}
+                      onChange={(e) => handleChange("message", e.target.value)}
                       placeholder="Tell us what's on your mind..."
-                      className="w-full bg-[#FFFDF5] border border-[#E8DAC0] focus:border-[#EFCB88] rounded-xl px-4 py-3 text-[#3A2E22] text-sm placeholder-black/40 outline-none transition-colors resize-none"
+                      className={`w-full bg-[#FFFDF5] border rounded-xl px-4 py-3 text-[#3A2E22] text-sm placeholder-black/40 outline-none transition-colors resize-none ${
+                        fieldErrors.message ? "border-red-400 focus:border-red-400" : "border-[#E8DAC0] focus:border-[#EFCB88]"
+                      }`}
                     />
+                    <div className="flex items-start justify-between mt-1">
+                      {fieldErrors.message ? (
+                        <p className="text-red-400 text-xs">{fieldErrors.message}</p>
+                      ) : (
+                        <span />
+                      )}
+                      <span
+                        className={`text-xs ml-auto ${
+                          form.message.length > 4500 ? "text-red-400" : "text-[#6B5C4A]/50"
+                        }`}
+                      >
+                        {form.message.length}/5000
+                      </span>
+                    </div>
                   </div>
+
+                  {/* API düzeyinde hata */}
+                  {apiError && (
+                    <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-red-600 text-sm">
+                      {apiError}
+                    </div>
+                  )}
 
                   <button
                     type="submit"
@@ -236,7 +409,8 @@ export default function ContactPage() {
             <div className="bg-[#FFFBF1] border border-[#E8DAC0] rounded-3xl p-7">
               <h3 className="text-[#3A2E22] font-bold text-base mb-3">Response Time</h3>
               <p className="text-[#6B5C4A]/80 text-sm leading-relaxed">
-                We typically respond within <span className="text-[#A56A00]">1–3 business days</span>. 
+                We typically respond within{" "}
+                <span className="text-[#A56A00]">1–3 business days</span>.{" "}
                 For quicker responses, reach out via YouTube comments or Instagram DM.
               </p>
             </div>
@@ -244,7 +418,7 @@ export default function ContactPage() {
             <div className="bg-[#FFFBF1] border border-[#E8DAC0] rounded-3xl p-7">
               <h3 className="text-[#3A2E22] font-bold text-base mb-3">Town Suggestions</h3>
               <p className="text-[#6B5C4A]/80 text-sm leading-relaxed">
-                Know a great affordable retirement town we haven't covered? 
+                Know a great affordable retirement town we haven't covered?{" "}
                 Send us the name and state — we review every suggestion for future content.
               </p>
             </div>

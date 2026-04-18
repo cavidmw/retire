@@ -115,7 +115,7 @@ const PLACEHOLDER_VIDEOS: VideoItem[] = Array.from({ length: 16 }, (_, i) => ({
     "Top Small Towns for Active Retirees in the USA",
   ][i],
   thumbnail: `https://picsum.photos/seed/vid${i + 10}/640/360`,
-  url: "https://www.youtube.com/@RetireTownwise",
+  url: "https://www.youtube.com/@RetireTownwise1",
 }));
 
 export default function VideosSection() {

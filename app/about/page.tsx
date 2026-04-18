@@ -24,22 +24,22 @@ function useScrollReveal(ref: React.RefObject<HTMLElement | null>) {
 
 const values = [
   {
-    icon: "🔍",
+    icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8 text-[#A56A00]"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>,
     title: "Honest Research",
     desc: "We don't romanticize. Every town review includes real trade-offs — healthcare access, weather realities, social scene, and actual costs.",
   },
   {
-    icon: "💰",
+    icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8 text-[#A56A00]"><line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>,
     title: "Affordability First",
     desc: "We focus on towns where a modest retirement income truly goes far — not just cheap on paper, but genuinely livable.",
   },
   {
-    icon: "🏘️",
+    icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8 text-[#A56A00]"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>,
     title: "Community Matters",
     desc: "A low cost of living means little if you're isolated. We evaluate social infrastructure, local amenities, and community feel.",
   },
   {
-    icon: "📍",
+    icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8 text-[#A56A00]"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></svg>,
     title: "USA Focused",
     desc: "Our scope is entirely within the United States — whether you're moving across state lines or planning your first retirement relocation.",
   },
@@ -117,8 +117,10 @@ export default function AboutPage() {
                 key={v.title}
                 className="bg-[#FFFBF1] border border-[#E8DAC0] rounded-2xl p-7 hover:border-[#A56A00]/30 transition-colors duration-300"
               >
-                <span className="text-3xl mb-4 block">{v.icon}</span>
-                <h3 className="text-[#3A2E22] font-bold text-lg mb-2">{v.title}</h3>
+              <div className="w-14 h-14 rounded-2xl bg-[#EFCB88]/20 flex items-center justify-center mb-4">
+                {v.icon}
+              </div>
+              <h3 className="text-[#3A2E22] font-bold text-lg mb-2">{v.title}</h3>
                 <p className="text-[#6B5C4A]/80 text-sm leading-relaxed">{v.desc}</p>
               </div>
             ))}
@@ -146,7 +148,7 @@ export default function AboutPage() {
               regularly on our YouTube channel. Subscribe so you don't miss a thing.
             </p>
             <a
-              href="https://www.youtube.com/@RetireTownwise"
+              href="https://www.youtube.com/@RetireTownwise1"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-3 bg-[#FF0000] hover:bg-[#cc0000] text-white font-bold text-sm px-8 py-4 rounded-full shadow-2xl shadow-red-900/30 transition-all duration-300 hover:scale-105"

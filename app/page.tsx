@@ -7,6 +7,7 @@ import HeroSection from "@/components/HeroSection";
 import BlogSection from "@/components/BlogSection";
 import VideosSection from "@/components/VideosSection";
 import SectionDivider from "@/components/SectionDivider";
+import ClientTracker from "@/components/ClientTracker";
 import type { BlogPost } from "@/lib/data";
 
 export default function Home() {
@@ -21,6 +22,7 @@ export default function Home() {
 
   return (
     <main className="min-h-screen">
+      <ClientTracker />
       <Header />
       <HeroSection />
       <SectionDivider />

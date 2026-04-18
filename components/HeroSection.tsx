@@ -138,7 +138,7 @@ export default function HeroSection() {
 
         {/* CTA Button */}
         <a
-          href="https://www.youtube.com/@RetireTownwise"
+          href="https://www.youtube.com/@RetireTownwise1"
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-3 bg-[#FF0000] hover:bg-[#cc0000] text-white font-bold text-base px-8 py-4 rounded-full shadow-2xl shadow-red-900/40 transition-all duration-300 hover:scale-105 hover:shadow-red-800/50 active:scale-95"

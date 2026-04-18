@@ -25,6 +25,7 @@ export async function GET(req: NextRequest) {
     let query = supabaseService
       .from('posts')
       .select('*')
+      .eq('status', 'published')
       .order('published_at', { ascending: false });
 
     if (limit && !Number.isNaN(limit) && limit > 0) {

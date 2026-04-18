@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { supabaseService } from "@/lib/supabaseServer";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import ClientTracker from "@/components/ClientTracker";
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://retiretownwise.com';
 
@@ -131,6 +132,7 @@ export default async function BlogDetailPage({ params }: { params: Promise<{ blo
 
   return (
     <main className="min-h-screen">
+      <ClientTracker postId={post.id} />
       <Header />
 
       {/* Hero image */}
