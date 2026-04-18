@@ -342,7 +342,7 @@ export default function RichEditor({
       lastValue.current = value;
       const current = editor.getHTML();
       if (value !== current) {
-        editor.commands.setContent(value || "", false);
+        editor.commands.setContent(value || "");
       }
     }
   }, [value, editor]);
