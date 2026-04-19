@@ -39,7 +39,9 @@ export async function GET(req: NextRequest) {
     }
 
     const items = (data ?? []).map(mapRowToBlogPost);
-    return NextResponse.json({ items });
+    return NextResponse.json({ items }, {
+      headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate', 'CDN-Cache-Control': 'no-store' },
+    });
   } catch (e: any) {
     console.error('[API /posts] Unexpected error:', e);
     return NextResponse.json({ items: [], error: e?.message || 'Unknown error' }, { status: 200 });

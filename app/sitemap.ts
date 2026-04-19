@@ -32,6 +32,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const { data: posts, error } = await supabaseService
       .from('posts')
       .select('id, updated_at, published_at')
+      .eq('status', 'published')
       .order('published_at', { ascending: false });
 
     if (!error && posts) {

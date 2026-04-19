@@ -34,6 +34,7 @@ async function getPost(id: string): Promise<BlogPost | null> {
     .from('posts')
     .select('*')
     .eq('id', id)
+    .eq('status', 'published')
     .single();
   if (error || !data) return null;
   return mapRow(data);
@@ -120,7 +121,7 @@ function VideoEmbed({ url }: { url: string }) {
   );
 }
 
-export const revalidate = 300; // Revalidate every 5 minutes
+export const revalidate = 0; // Always fetch fresh data from Supabase
 
 export default async function BlogDetailPage({ params }: { params: Promise<{ blogId: string }> }) {
   const { blogId } = await params;

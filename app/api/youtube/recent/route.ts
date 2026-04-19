@@ -1,5 +1,17 @@
 import { NextResponse } from "next/server";
 
+function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&#(\d+);/g, (_match, dec) => String.fromCharCode(Number(dec)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_match, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#39;/g, "'");
+}
+
 export async function GET() {
   const apiKey = process.env.YOUTUBE_API_KEY || process.env.NEXT_PUBLIC_YOUTUBE_API_KEY;
   const channelId = process.env.YOUTUBE_CHANNEL_ID || process.env.NEXT_PUBLIC_YOUTUBE_CHANNEL_ID;
@@ -27,7 +39,7 @@ export async function GET() {
     const data = await res.json();
     const items = (data?.items || []).map((item: any) => ({
       id: item.id?.videoId || item.etag,
-      title: item.snippet?.title || "",
+      title: decodeHtmlEntities(item.snippet?.title || ""),
       thumbnail:
         item.snippet?.thumbnails?.medium?.url ||
         item.snippet?.thumbnails?.default?.url ||

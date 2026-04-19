@@ -20,6 +20,7 @@ export async function GET(_req: NextRequest, ctx: { params: { id: string } }) {
     .from('posts')
     .select('*')
     .eq('id', id)
+    .eq('status', 'published')
     .single();
 
   if (error) {

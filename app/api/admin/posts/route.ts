@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { supabaseService } from '@/lib/supabaseServer';
 import { isAdminAuthenticated, checkRateLimit, getClientIP } from '@/lib/adminAuth';
 import sanitizeHtml from 'sanitize-html';
@@ -114,6 +115,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Failed to create post', details: error.message }, { status: 500 });
     }
 
+    // Revalidate public pages so new post appears immediately
+    try {
+      revalidatePath('/', 'page');
+      revalidatePath('/sitemap.xml');
+    } catch (revErr) {
+      console.warn('[Admin POST /posts] revalidation warning:', revErr);
+    }
+
     return NextResponse.json({ ok: true, item: mapRow(data) }, { status: 201 });
   } catch (e: any) {
     console.error('[Admin POST /posts] error:', e);
@@ -164,6 +173,15 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Failed to update post', details: error.message }, { status: 500 });
     }
 
+    // Revalidate public pages so edits appear immediately
+    try {
+      revalidatePath('/', 'page');
+      revalidatePath(`/${id}`, 'page');
+      revalidatePath('/sitemap.xml');
+    } catch (revErr) {
+      console.warn('[Admin PUT /posts] revalidation warning:', revErr);
+    }
+
     return NextResponse.json({ ok: true, item: mapRow(data) });
   } catch (e: any) {
     console.error('[Admin PUT /posts] error:', e);
@@ -192,6 +210,16 @@ export async function DELETE(req: NextRequest) {
       console.error('[Admin DELETE /posts] Supabase error:', error);
       return NextResponse.json({ ok: false, error: 'Failed to delete post', details: error.message }, { status: 500 });
     }
+
+    // Revalidate public pages so deleted post disappears immediately
+    try {
+      revalidatePath('/', 'page');
+      revalidatePath(`/${id}`, 'page');
+      revalidatePath('/sitemap.xml');
+    } catch (revErr) {
+      console.warn('[Admin DELETE /posts] revalidation warning:', revErr);
+    }
+
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     console.error('[Admin DELETE /posts] error:', e);
